@@ -1,0 +1,22 @@
+Circuit: * C:\users\alejopm\My Documents\Personal\CargaElectornica\linerizacao\diff+sallenkey.asc
+
+Direct Newton iteration for .op point succeeded.
+
+Date: Fri Jul 24 17:43:32 2020
+Total elapsed time: 8.409 seconds.
+
+tnom = 27
+temp = 27
+method = modified trap
+totiter = 66799
+traniter = 66773
+tranpoints = 21801
+accept = 15421
+rejected = 6380
+matrix size = 384
+fillins = 548
+solver = Normal
+Thread vector: 46.2/34.7[4] 27.6/13.8[4] 19.7/10.8[4] 4.1/5.8[1]  2592/500
+Matrix Compiler1: 44.31 KB object code size  32.0/14.6/[8.3]
+Matrix Compiler2: 40.32 KB object code size  13.3/14.0/[6.6]
+
