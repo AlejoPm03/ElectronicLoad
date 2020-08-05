@@ -14,6 +14,7 @@
 #include "avr/io.h"
 #include "avr/interrupt.h"
 #include "conf.h"
+#include "machine.h"
 #include "dbg_vrb.h"
 #include "usart.h"
 #include "../lib/bit_utils.h"

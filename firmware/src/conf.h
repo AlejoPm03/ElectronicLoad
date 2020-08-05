@@ -42,8 +42,10 @@
 #define D_MIN       0.33
 #define D_MAX       0.99
 #define IO_SETPOINT 1.0f
+#define IO_DISABLED -0.01f
 #define IO_MAX      10
 #define VO_MAX      21
+#define VO_MIN      0.10f
 #define VI_MIN      21
 #define PERIOD      0.0009960853844391542f;// 0.0001995171684523453f; // 0.0002      // 5kHz
 #define F_PWM       30000UL
@@ -59,7 +61,7 @@
 
 #ifdef MACHINE_ON
 #define MACHINE_TIMER_FREQUENCY             300           //<! machine timer frequency in Hz
-#define MACHINE_TIMER_PRESCALER             1024          //<! machine timer prescaler
+#define MACHINE_TIMER_PRESCALER             256          //<! machine timer prescaler
 #define MACHINE_FREQUENCY                   100           //<! machine frequency in Hz
 #define MACHINE_CLK_DIVIDER_VALUE           (MACHINE_TIMER_FREQUENCY)/(MACHINE_FREQUENCY)  //<! machine_run clock divider
 #endif // MACHINE_ON

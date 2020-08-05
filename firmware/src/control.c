@@ -70,21 +70,17 @@ inline float piIo(float r, float y){
 inline void control(void){
     static float vi_old = 0;
     static uint16_t vi_stable_counter = 0;
-
+        
     // call feedback controller   
     control_feedback();
     // apply outputs
-    OCR1B = ICR1 * dt;
-    
-    control_flags.enable = 1;
-    if(control_flags.enable) set_bit(PWM_ENABLE_PORT, PWM_ENABLE);
-    else       clr_bit(PWM_ENABLE_PORT, PWM_ENABLE); 
+    OCR1B = ICR1 * dt;    
 }
 
 inline void control_feedback(void)
 {
     io_setpoint = IO_SETPOINT;
-
+    
     // CURRENT CONTROL as inner loop
     // soft start -> if(io_max < IO_MAX) io_max += 0.01;
     //if(io_max > IO_MAX) io_max = IO_MAX;

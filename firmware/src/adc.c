@@ -80,7 +80,7 @@ ISR(ADC_vect)
 {
     cli();
     static const float vi_coeff = 0.06582490575070313f;
-    static const float vo_coeff = 0.06717781789490249f;
+    static const float vo_coeff = 0.028953134236407947f;
     static const float io_coeff = 0.00994393700257938f;
 
     uint16_t adc = ADC;                     // read adc
@@ -120,6 +120,8 @@ ISR(ADC_vect)
 
     ADMUX = (ADMUX & 0xF8) | ++channel;   // select next channel
     //ADCSRA = ADCSRA;                  // rearm for next conversion if TIMER0 not in use
+
+    acumulate_measurements();
 
     sei();
 }

@@ -20,6 +20,7 @@ typedef enum state_machine{
     STATE_INITIALIZING,                                                                         
     STATE_IDLE,                                                                  
     STATE_RUNNING,                                                               
+    STATE_DISCHARGING,                                                               
     STATE_ERROR,                                                                 
     STATE_RESET,                                                                 
 } state_machine_t;                                                               
@@ -39,15 +40,19 @@ typedef union error_flags{
 }error_flags_t;                                                                  
                                                                                  
 typedef struct measurements{                                                     
-    uint16_t    vo_avg;         // average value                                 
+    float    vo_avg;         // average value                                 
     uint16_t    vo_avg_sum_count;                                                
-    uint64_t    vo_avg_sum;     // average sum value                             
-    uint16_t    io_avg;         // average value                                 
+    float    vo_avg_sum;     // average sum value                             
+    float    io_avg;         // average value                                 
     uint16_t    io_avg_sum_count;                                                               
-    uint64_t    io_avg_sum;     // average sum value                             
-    uint16_t    vi_avg;         // average value                                 
+    float    io_avg_sum;     // average sum value                             
+    float    vi_avg;         // average value                                 
     uint16_t    vi_avg_sum_count;                                                
-    uint64_t    vi_avg_sum;     // average sum value                             
+    float    vi_avg_sum;     // average sum value                             
+    float    W_avg;
+    float    Ah;
+    float    Wh;
+    float    d_ms;
     uint8_t     dt;                                                              
 }measurements_t;    
 
@@ -62,6 +67,7 @@ volatile uint8_t total_errors;           // Contagem de ERROS
                                                                                     
 // other variables                                                                  
 volatile uint8_t led_clk_div;  
+volatile float ms;
 
 void machine_init(void)
 {
@@ -145,6 +151,11 @@ inline void set_state_running(void)
     state_machine = STATE_RUNNING;
 }
 
+inline void set_state_discharging(void)
+{
+    VERBOSE_MSG_MACHINE(usart_send_string("\n>>>DISCHARGING STATE\n"));
+    state_machine = STATE_DISCHARGING;
+}
 /**
  * @brief set reset state
  */
@@ -198,6 +209,8 @@ inline void task_initializing(void)
 
     set_machine_initial_state();
 
+    io_setpoint = IO_DISABLED;
+
     VERBOSE_MSG_INIT(usart_send_string("System initialized without errors.\n"));
     set_state_idle();
 }
@@ -214,7 +227,9 @@ inline void task_idle(void)
     }        
 #endif
 
-    set_state_running();
+    io_setpoint = IO_DISABLED;
+    if(vo>VO_MIN)
+        set_state_running();
 
 }
 
@@ -230,9 +245,33 @@ inline void task_running(void)
         led_clk_div = 0;
     }
 #endif // LED_ON
+
+    set_state_discharging();
+
 }
 
 
+inline void task_discharging(void)
+{
+    const float io_step=0.01;
+#ifdef LED_ON
+    if(led_clk_div++ >= 2){
+        cpl_led(LED1);
+        led_clk_div = 0;
+    }
+#endif // LED_ON
+
+    if(io_setpoint<IO_SETPOINT)
+        io_setpoint+=io_step;
+    else
+        io_setpoint=IO_SETPOINT;
+
+    if(vo<VO_MIN)
+        set_state_idle();
+    
+
+
+}
 /**
  * @brief error task checks the system and tries to medicine it.
  */
@@ -292,46 +331,46 @@ void print_infos(void)
 {
 #ifdef PRINT_INFOS
     static uint8_t i = 0;
-    
+    calculate_measurements();
     switch(i++){
         case 0:
             //print_system_flags();
             //usart_send_string("\nvi: ");
-            //usart_send_float(vi);
+            //usart_send_float(measurements.vi_avg);
             break;
         case 1:
             //print_error_flags();
-            //usart_send_string(" , vo: ");
-            usart_send_float(IO_SETPOINT);
+            usart_send_string(" , vo: ");
+            usart_send_float(measurements.vo_avg);
+            //usart_send_float(IO_SETPOINT);
             break;
         case 2:
             //print_control_others(); 
-            //usart_send_string(" , io: ");
-            usart_send_float(io);
+            usart_send_string(" , io: ");
+            usart_send_float(measurements.io_avg);
             break;
         case 3:
-            //usart_send_string(" , dt: ");
+            usart_send_string(" , dt: ");
             usart_send_float(dt);
-            usart_send_char('\n');
-            i = 0;
             //usart_send_char(',');
             //usart_send_char(dt_min);
             break;
         case 4:
-            usart_send_string(" , dtsr: ");
-            usart_send_char(control_flags.dt_safe_range + '0');
+            usart_send_string(" , s: ");
+            usart_send_float(ms/100);
             break;
         case 5:
-            usart_send_string(" , vosr: ");
-            usart_send_char(control_flags.vo_safe_range + '0');
+            usart_send_string(" , mchst: ");
+            usart_send_char(state_machine + '0');
             break;
         case 6:
-            usart_send_string(" , visr: ");
-            usart_send_char(control_flags.vi_safe_range + '0');
+            usart_send_string(" , avg_dt: ");
+            usart_send_float(measurements.d_ms);
+            i  = 0;
             break;
         case 7:
-            usart_send_string(" , vist: ");
-            usart_send_char(control_flags.vi_stable + '0');
+            usart_send_string(" , wh: ");
+            usart_send_float(measurements.wh);
             break;
         default:
             //VERBOSE_MSG_MACHINE(usart_send_char('\n'));
@@ -339,7 +378,28 @@ void print_infos(void)
             usart_send_char(control_flags.enable+'0');
             break;
     }
+    
+    usart_send_char('\n');
 #endif
+}
+void acumulate_measurements(void)
+{
+    measurements.vo_avg_sum += vi;
+    measurements.vo_avg_sum_count ++;
+    measurements.io_avg_sum += io;
+    measurements.io_avg_sum_count ++;
+}
+void calculate_measurements(void)
+{
+    static float _ms = 0;
+    measurements.vo_avg = measurements.vo_avg_sum/
+                            measurements.vo_avg_sum_count;
+    measurements.io_avg = measurements.io_avg_sum/
+                            measurements.io_avg_sum_count;
+    measurements.W_avg = measurements.vo_avg * measurements.io_avg;
+    measurements.d_ms = ms -_ms;
+    measurements.Ah = measurements.io_avg/measurements.d_ms;
+    measurements.Wh = measurements.W_avg/measurements.d_ms;
 }
 
 /**
@@ -348,6 +408,7 @@ void print_infos(void)
 inline void machine_run(void)
 {
 
+    acumulate_measurements();
     if(print_adc){ print_infos(); print_adc = 0;}  
     if(machine_clk){
         machine_clk = 0;
@@ -371,6 +432,10 @@ inline void machine_run(void)
                 task_running();
                 
                 break;
+            case STATE_DISCHARGING:
+                task_discharging();
+                
+                break;
             case STATE_ERROR:
                 task_error();
 
@@ -387,6 +452,7 @@ inline void machine_run(void)
 */
 ISR(TIMER2_COMPA_vect)
 {
+    ms+=1/(MACHINE_FREQUENCY/100);
     if(++machine_clk_divider == MACHINE_CLK_DIVIDER_VALUE){
         machine_clk_divider = 0;
         machine_clk = 1;
